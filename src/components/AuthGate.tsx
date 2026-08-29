@@ -1,13 +1,46 @@
-import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { login, register, fetchMe } from '../api/endpoints'
 import { useAuthStore } from '../store/authStore'
-import { BookMarked } from 'lucide-react'
+import { useWorkspaceStore } from '../store/workspaceStore'
+import { BookMarked, Loader2 } from 'lucide-react'
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient()
   const accessToken = useAuthStore((s) => s.accessToken)
-  if (accessToken) return <>{children}</>
-  return <AuthForm />
+  const logout = useAuthStore((s) => s.logout)
+  const resetWorkspace = useWorkspaceStore((s) => s.resetWorkspace)
+  const sessionQuery = useQuery({
+    queryKey: ['auth-session'],
+    queryFn: fetchMe,
+    enabled: Boolean(accessToken),
+    retry: false,
+  })
+
+  useEffect(() => {
+    if (!accessToken || sessionQuery.isError) {
+      queryClient.clear()
+      resetWorkspace()
+      if (accessToken) logout()
+      return
+    }
+    if (sessionQuery.data) queryClient.setQueryData(['me'], sessionQuery.data)
+  }, [accessToken, logout, queryClient, resetWorkspace, sessionQuery.data, sessionQuery.isError])
+
+  if (!accessToken || sessionQuery.isError) return <AuthForm />
+
+  if (sessionQuery.isPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-ink-bg text-ink-muted">
+        <div className="flex items-center gap-2 text-sm">
+          <Loader2 size={16} className="animate-spin text-verdigris" />
+          Validating session…
+        </div>
+      </div>
+    )
+  }
+
+  return <>{children}</>
 }
 
 function AuthForm() {

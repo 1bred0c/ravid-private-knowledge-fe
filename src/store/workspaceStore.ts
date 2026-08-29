@@ -9,6 +9,7 @@ interface WorkspaceState {
   clearDocuments: () => void
   setActiveConversation: (id: string | null) => void
   toggleHyde: () => void
+  resetWorkspace: () => void
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -28,4 +29,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   clearDocuments: () => set({ selectedDocumentIds: [], activeConversationId: null }),
   setActiveConversation: (id) => set({ activeConversationId: id }),
   toggleHyde: () => set((state) => ({ useHyde: !state.useHyde })),
+  resetWorkspace: () =>
+    set({ selectedDocumentIds: [], activeConversationId: null, useHyde: false }),
 }))
