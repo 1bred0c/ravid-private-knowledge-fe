@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink-bg text-ink-text font-sans antialiased;
+}
+
+/* visible keyboard focus everywhere, per accessibility floor */
+:focus-visible {
+  outline: 2px solid theme('colors.verdigris.bright');
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: theme('colors.ink.line');
+  border-radius: 8px;
+}
+
+/* markdown answer body inside paper surface */
+.answer-prose {
+  @apply text-paper-ink leading-relaxed;
+}
+.answer-prose p { @apply mb-3; }
+.answer-prose ul, .answer-prose ol { @apply mb-3 ml-5 list-disc; }
+.answer-prose code {
+  @apply font-mono text-[0.85em] bg-paper-dim px-1 py-0.5 rounded;
+}
+.answer-prose strong { @apply font-semibold; }
+
+.input {
+  @apply w-full bg-ink-bg border border-ink-line rounded-card px-3 py-2 text-sm text-ink-text
+    placeholder:text-ink-muted focus:border-verdigris outline-none transition-colors;
+}
