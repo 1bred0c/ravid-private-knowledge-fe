@@ -17,6 +17,8 @@ function AuthForm() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [validationError, setValidationError] = useState('')
   const setTokens = useAuthStore((s) => s.setTokens)
 
   const loginMutation = useMutation({
@@ -34,7 +36,6 @@ function AuthForm() {
         firstName,
         lastName,
         password,
-        password_confirm: password,
       }),
     onSuccess: () => loginMutation.mutate(),
   })
@@ -44,8 +45,16 @@ function AuthForm() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (mode === 'login') loginMutation.mutate()
-    else registerMutation.mutate()
+    setValidationError('')
+    if (mode === 'login') {
+      loginMutation.mutate()
+      return
+    }
+    if (password !== confirmPassword) {
+      setValidationError('Passwords do not match.')
+      return
+    }
+    registerMutation.mutate()
   }
 
   return (
@@ -117,11 +126,29 @@ function AuthForm() {
             />
           </Field>
 
-          {error && (
+          {mode === 'register' && (
+            <Field label="Confirm password">
+              <input
+                className="input"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value)
+                  setValidationError('')
+                }}
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+            </Field>
+          )}
+
+          {(validationError || error) && (
             <p className="text-danger text-sm">
-              {(error as any)?.response?.data?.detail ??
-                (error as any)?.response?.data?.error ??
-                'Something went wrong. Check the details and try again.'}
+              {validationError ||
+                ((error as any)?.response?.data?.detail ??
+                  (error as any)?.response?.data?.error ??
+                  'Something went wrong. Check the details and try again.')}
             </p>
           )}
 

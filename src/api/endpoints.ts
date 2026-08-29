@@ -27,7 +27,6 @@ export async function register(payload: {
   firstName: string
   lastName: string
   password: string
-  password_confirm: string
 }) {
   const { data } = await api.post('/api/auth/register/', payload)
   return data
