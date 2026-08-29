@@ -1,57 +1,108 @@
-# RAVID Frontend — "The Archive"
+# RAVID Frontend — The Archive
 
-A small NotebookLM-style demo UI for the RAVID Private Knowledge API: upload a
-document in the left **Ledger**, click it once it's `READY`, and chat with it
-in the **Reading Room**. Answers open a **Citations** drawer showing the real
-retrieved chunks (and, with HyDE on, the hypothetical passage used only for
-search).
+React interface for the [RAVID Private Knowledge API](https://github.com/1bred0c/ravid-private-knowledge-api). Users can manage subscriptions, upload and select documents, keep separate conversations, ask grounded questions, and inspect the source chunks returned by the RAG pipeline.
 
-## Stack
+## Run the complete application with Docker
 
-Vite + React + TypeScript, Tailwind CSS, TanStack Query (polling document
-status / chat history), Zustand (auth + selected document), Axios (JWT
-interceptor with auto-refresh on 401), react-markdown for answers.
+The backend and frontend live in separate repositories and each has its own Compose stack.
 
-## Setup
+### 1. Start the backend
 
-```bash
+```powershell
+git clone https://github.com/1bred0c/ravid-private-knowledge-api.git
+Set-Location ravid-private-knowledge-api
+Copy-Item .env.example .env
+```
+
+Edit the backend `.env` and provide at least:
+
+```env
+DJANGO_SECRET_KEY=replace-with-a-long-random-secret
+OPENROUTER_API_KEY=your-openrouter-api-key
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
+
+Then build and start Django, PostgreSQL/pgvector, Redis, Celery, and Flower:
+
+```powershell
+docker compose up --build -d
+docker compose ps
+```
+
+Wait until the `web` service reports healthy. Its health endpoint is available at http://127.0.0.1:8000/api/health/.
+
+### 2. Start the frontend
+
+Open another terminal:
+
+```powershell
+git clone https://github.com/1bred0c/ravid-private-knowledge-fe.git
+Set-Location ravid-private-knowledge-fe
+docker compose up --build -d
+docker compose ps
+```
+
+Open http://localhost:5173. The production bundle is built by Node and served by Nginx; the default API URL is `http://127.0.0.1:8000`.
+
+If the backend is hosted elsewhere, set its public URL before building the frontend image:
+
+```powershell
+$env:VITE_API_BASE_URL = "https://api.example.com"
+docker compose up --build -d
+```
+
+`VITE_API_BASE_URL` is compiled into the Vite bundle, so rebuild the image after changing it. The backend must also include the frontend origin in `CORS_ALLOWED_ORIGINS`.
+
+### 3. View logs and stop the application
+
+Run these commands inside the corresponding repository:
+
+```powershell
+docker compose logs -f
+docker compose down
+```
+
+Backend data stays in Docker volumes after `docker compose down`. Only use `docker compose down --volumes` when a complete database, Redis, and uploaded-file reset is intended.
+
+## Run locally for development
+
+Start the backend stack as described above, then run the frontend outside Docker:
+
+```powershell
 npm install
-cp .env.example .env
-# .env → VITE_API_BASE_URL=http://127.0.0.1:8000  (your Django backend)
+Copy-Item .env.example .env
 npm run dev
 ```
 
-Open http://localhost:5173. Make sure the backend is running (`docker compose
-up --build -d` in the API repo) and CORS allows this origin — add to the
-backend:
+The default frontend environment is:
 
-```bash
-pip install django-cors-headers
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-```python
-# settings.py
-INSTALLED_APPS += ["corsheaders"]
-MIDDLEWARE.insert(0, "corsheaders.middleware.CorsMiddleware")  # before CommonMiddleware
-CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
+Open http://localhost:5173. Vite reloads the page as source files change.
+
+## Production image
+
+The `Dockerfile` uses two stages:
+
+1. Node 22 installs locked dependencies and creates the Vite production build.
+2. Nginx serves the generated static assets and falls back to `index.html` for client-side routes.
+
+Build and run it without Compose:
+
+```powershell
+docker build --build-arg VITE_API_BASE_URL=http://127.0.0.1:8000 -t ravid-frontend .
+docker run --rm -p 5173:80 ravid-frontend
 ```
 
-## Flow
+## Main application flow
 
-1. Register / sign in (JWT stored in memory only, refreshed automatically).
-2. Upload a PDF/TXT/Markdown file — the Ledger polls `/api/documents/status/`
-   every 2s while a document is `UPLOADED`/`PROCESSING`.
-3. Click a `READY` document to open its Reading Room.
-4. Ask a question — creates a conversation on first send, then calls
-   `/api/chat/query/` with `document_ids: [selectedId]`.
-5. Toggle **HyDE** top-right to send `use_hyde: true`.
-6. Click the "N sources · mode →" link under any answer to open the Citations
-   drawer.
+1. Register or sign in. The Axios client sends the access token and automatically uses the refresh token after a `401` response.
+2. Choose a subscription plan and inspect the account quota.
+3. Upload PDF, TXT, or Markdown files and wait for asynchronous ingestion to reach `READY`.
+4. Create a conversation and select one or more documents for each question.
+5. Ask using standard RAG or enable HyDE retrieval.
+6. Open Citations to inspect `retrieval_metadata.source_chunks` returned by the backend.
 
-## Notes
-
-- The demo persists the JWT pair in local storage so a page refresh keeps the
-  session and the Axios interceptor can refresh an expired access token. For a
-  production deployment, prefer an httpOnly refresh-cookie flow.
-- Ready documents can be selected together; chat sends all selected IDs through
-  the backend's multi-document `document_ids` field.
+The JWT pair is persisted in browser local storage for this demo. A production security hardening pass should move refresh-token handling to secure, httpOnly cookies.
